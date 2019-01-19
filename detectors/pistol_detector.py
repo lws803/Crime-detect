@@ -128,4 +128,30 @@ class PistolDetector:
 
     def clearVotes(self):
         self.votes = []
+
+# main
+if __name__ == '__main__':
+    
+    cap = cv2.VideoCapture(0)
+    ret, frame = cap.read()
+    # frame = cv2.resize(frame, (0,0), fx=0.5, fy=0.5) # Scale resizing
+
+    pd = PistolDetector(frame)
+
+    while(True):
+        ret, frame = cap.read()
+        # frame = cv2.resize(frame, (0,0), fx=0.5, fy=0.5) # Scale resizing
+        frame = pd.detect(frame)
+
+
+        frame = cv2.resize(frame, (0,0), fx=1.0/SCALE, fy=1.0/SCALE) # Scale resizing
+
+        cv2.imshow('image', frame)
+
+        cv2.waitKey(1)
+        # exit if the key "q" is pressed
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+
+    cv2.destroyAllWindows()
     

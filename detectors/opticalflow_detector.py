@@ -151,7 +151,6 @@ class OpticalflowDetector:
         self.votes = []
 
 
-
 # main
 if __name__ == '__main__':
     
