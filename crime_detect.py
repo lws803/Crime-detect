@@ -10,11 +10,12 @@ import timeit
 import time
 import math
 import logging
+import datetime
 
 from PyQt5 import QtCore
 from PyQt5 import QtWidgets
 from PyQt5 import QtGui
-from PyQt5.QtCore import pyqtSignal
+from PyQt5 import QtMultimedia
 
 from IPython.display import clear_output
 
@@ -28,9 +29,9 @@ def grabVideoFeed():
     grabbed, frame = camera.read()
     return frame if grabbed else None
 
-class ImageViewerPistol(QtWidgets.QWidget):
+class ImageViewer(QtWidgets.QWidget):
     def __init__(self, parent = None):
-        super(ImageViewerPistol, self).__init__(parent)
+        super(ImageViewer, self).__init__(parent)
         self.image = QtGui.QImage()
         self.setAttribute(QtCore.Qt.WA_OpaquePaintEvent)
  
@@ -52,43 +53,20 @@ class ImageViewerPistol(QtWidgets.QWidget):
             self.setFixedSize(image.size())
         self.update()
  
-class ImageViewerKnife(QtWidgets.QWidget):
-    def __init__(self, parent = None):
-        super(ImageViewerKnife, self).__init__(parent)
-        self.image = QtGui.QImage()
-        self.setAttribute(QtCore.Qt.WA_OpaquePaintEvent)
- 
-    def paintEvent(self, event):
-        painter = QtGui.QPainter(self)
-        painter.drawImage(0,0, self.image)
-        self.image = QtGui.QImage()
- 
-    def initUI(self):
-        self.setWindowTitle('Test')
- 
-    @QtCore.pyqtSlot(QtGui.QImage)
-    def setImage(self, image):
-        if image.isNull():
-            print("Viewer Dropped frame!")
- 
-        self.image = image
-        if image.size() != self.size():
-            self.setFixedSize(image.size())
-        self.update()
-
 class WorkerPistol(QtCore.QObject):
-    finished = pyqtSignal() # our signal out to the main thread to alert it we've completed our work
+    finished = QtCore.pyqtSignal() # our signal out to the main thread to alert it we've completed our work
     VideoSignal = QtCore.pyqtSignal(QtGui.QImage)
-    loaded = pyqtSignal()
+    loaded = QtCore.pyqtSignal()
+    alert = QtCore.pyqtSignal()
 
     def __init__(self):
         super(WorkerPistol, self).__init__()
         self.working = True # this is our flag to control our loop 
         self.flag = True
+        self.alert_flag = True
 
     def work(self):
         pd = PistolDetector(log_level=logging.DEBUG) 
-        self.image_viewer_pistol = ImageViewerPistol()
         self.VideoSignal.connect(self.image_viewer_pistol.setImage)  
 
         while self.working:
@@ -112,23 +90,29 @@ class WorkerPistol(QtCore.QObject):
                 self.loaded.emit()
                 self.flag = False
 
+            if (votes >= 5) & (self.alert_flag):
+                self.alert.emit()
+                self.alert_flag = False
+
             clear_output()
 
         self.flag = True
         # self.VideoSignal.emit(QtGui.QImage("white.jpg"))       
-        qt_image = QtGui.QImage("offline-pistol.png")
+        qt_image = QtGui.QImage("./res/images/offline-pistol.png")
         self.VideoSignal.emit(qt_image)
         self.finished.emit() # alert our gui that the loop stopped
 
 class WorkerKnife(QtCore.QObject):
-    finished = pyqtSignal() # our signal out to the main thread to alert it we've completed our work
+    finished = QtCore.pyqtSignal() # our signal out to the main thread to alert it we've completed our work
     VideoSignal = QtCore.pyqtSignal(QtGui.QImage)
-    loaded = pyqtSignal()
+    loaded = QtCore.pyqtSignal()
+    alert = QtCore.pyqtSignal()
 
     def __init__(self):
         super(WorkerKnife, self).__init__()
         self.working = True # this is our flag to control our loop 
         self.flag = True
+        self.alert_flag = True
 
     def work(self):
         ret, frame = camera.read()
@@ -158,86 +142,171 @@ class WorkerKnife(QtCore.QObject):
                 self.loaded.emit()
                 self.flag = False
 
+            if (votes >= 5) & (self.alert_flag):
+                self.alert.emit()
+                self.alert_flag = False
+
             cv2.waitKey(40)
             clear_output()
 
         self.flag = True
         # self.VideoSignal.emit(QtGui.QImage("white.jpg"))       
-        qt_image = QtGui.QImage("offline-knife.png")
+        qt_image = QtGui.QImage("./res/images/offline-knife.png")
         self.VideoSignal.emit(qt_image)
         self.finished.emit() # alert our gui that the loop stopped
+
+class QtHandler(logging.Handler):
+    def __init__(self):
+        logging.Handler.__init__(self)
+    def emit(self, record):
+        record = self.format(record)
+        if record: XStream.stdout().write('%s\n'%record)
+
+logger_msg = logging.getLogger(__name__)
+handler_msg = QtHandler()
+handler_msg.setFormatter(logging.Formatter("%(levelname)s: %(message)s"))
+logger_msg.addHandler(handler_msg)
+logger_msg.setLevel(logging.DEBUG)
+
+class XStream(QtCore.QObject):
+    _stdout = None
+    # _stderr = None
+    messageWritten = QtCore.pyqtSignal(str)
+    def flush( self ):
+        pass
+    def fileno( self ):
+        return -1
+    def write( self, msg ):
+        if ( not self.signalsBlocked() ):
+            self.messageWritten.emit(str(msg))
+    @staticmethod
+    def stdout():
+        if ( not XStream._stdout ):
+            XStream._stdout = XStream()
+        return XStream._stdout
 
 class Window(QtWidgets.QMainWindow):
 
     def __init__(self):
         super(Window, self).__init__()
         self.setWindowTitle("Crime Predict")
-        self.setStyleSheet("background-color: white;")         
+        self.setStyleSheet("./res/images/background-color: white;")         
 
         self.thread_pistol = None
         self.thread_knife = None
         self.worker_pistol = None
         self.worker_knife = None
    
-        #Buttons to start the videocapture:
-     
+        # Setting up pistol buttons
         self.push_button_pistol_start = QtWidgets.QPushButton('Start Pistol_Detect')
         self.push_button_pistol_start.clicked.connect(self.start_pistol_detect)
+        self.push_button_pistol_wait = QtWidgets.QPushButton('Please wait... Pistol_Detect is loading...')
         self.push_button_pistol_stop = QtWidgets.QPushButton('Stop Pistol_Detect')
+        self.push_button_pistol_wait.hide()
         self.push_button_pistol_stop.hide()
 
+        # Setting up knife buttons
         self.push_button_knife_start = QtWidgets.QPushButton('Start Knife_Detect')
         self.push_button_knife_start.clicked.connect(self.start_knife_detect)
+        self.push_button_knife_wait = QtWidgets.QPushButton('Please Wait... Knife_Detect is loading...')
         self.push_button_knife_stop = QtWidgets.QPushButton('Stop Knife_Detect')
+        self.push_button_knife_wait.hide() 
         self.push_button_knife_stop.hide()
 
+        # Show initialised cam feed (offline)
         self.w1 = QtWidgets.QLabel()
-        self.w1.setPixmap(QtGui.QPixmap("offline-pistol.png"))
+        self.w1.setPixmap(QtGui.QPixmap("./res/images/offline-pistol.png"))
         self.w2 = QtWidgets.QLabel()
-        self.w2.setPixmap(QtGui.QPixmap("offline-knife.png"))
+        self.w2.setPixmap(QtGui.QPixmap("./res/images/offline-knife.png"))
 
-        # self.horizontal_layout_videos = QtWidgets.QHBoxLayout()
-        # self.horizontal_layout_videos.addWidget(self.l1)
-        # self.horizontal_layout_videos.addWidget(self.l2)
-
+        # Vertical layout for pistol-related widgets
         self.pistol_buttons = QtWidgets.QVBoxLayout()
         self.pistol_buttons.addWidget(self.push_button_pistol_start)
+        self.pistol_buttons.addWidget(self.push_button_pistol_wait)
         self.pistol_buttons.addWidget(self.push_button_pistol_stop)
         self.pistol_buttons.addWidget(self.w1)
 
+        # Vertical layout for knife-related widgets
         self.knife_buttons = QtWidgets.QVBoxLayout()
         self.knife_buttons.addWidget(self.push_button_knife_start)
+        self.knife_buttons.addWidget(self.push_button_knife_wait)
         self.knife_buttons.addWidget(self.push_button_knife_stop)
         self.knife_buttons.addWidget(self.w2)
 
+        # Horizontal layout for both pistol and knife vertical layouts
         self.horizontal_layout_buttons = QtWidgets.QHBoxLayout()
         self.horizontal_layout_buttons.addLayout(self.pistol_buttons)
         self.horizontal_layout_buttons.addLayout(self.knife_buttons)
 
-        self.main_layout = QtWidgets.QVBoxLayout()
-        self.main_layout.addLayout(self.horizontal_layout_buttons)    
-        # self.main_layout.addLayout(self.horizontal_layout_videos)
+        # Text Browser Box for messages
+        self.message_box = QtWidgets.QTextBrowser()
+        self.message_box.setFixedSize(800,200)
+        self.message_box.setFontFamily("Tahoma")
+        XStream.stdout().messageWritten.connect( self.message_box.insertPlainText )
+        self.message_box.insertPlainText('WELCOME TO CRIME_PREDICT\n')
 
+        # Main layout for the central widget
+        self.main_layout = QtWidgets.QVBoxLayout()
+        self.main_layout.addLayout(self.horizontal_layout_buttons)  
+        self.main_layout.addWidget(self.message_box)  
+
+        # Set central widget & its layout
         self.layout_widget = QtWidgets.QWidget()
         self.layout_widget.setLayout(self.main_layout)
-
         self.setCentralWidget(self.layout_widget)
+
+        # Play start-up sound
+        self.start_up_sound = QtMultimedia.QSoundEffect()
+        self.start_up_sound.setSource(QtCore.QUrl.fromLocalFile('./res/sfx/start-up.wav'))  
+        self.start_up_sound.play()
+
+        # Initialise sounds FX
+        self.info_start = QtMultimedia.QSoundEffect()
+        self.info_start.setSource(QtCore.QUrl.fromLocalFile('./res/sfx/info-start.wav'))
+        self.info_stop = QtMultimedia.QSoundEffect()
+        self.info_stop.setSource(QtCore.QUrl.fromLocalFile('./res/sfx/info-stop.wav'))                    
 
     def remove_pistol_load(self):
         self.pistol_buttons.removeWidget(self.l1)
         self.pistol_buttons.addWidget(self.pistol_video)
+        self.push_button_pistol_wait.hide()
+        self.push_button_pistol_stop.show()
 
     def remove_knife_load(self):
         self.knife_buttons.removeWidget(self.l2)
         self.knife_buttons.addWidget(self.knife_video)
+        self.push_button_knife_wait.hide()
+        self.push_button_knife_stop.show()
+
+    def alert_pistol(self):
+        self.alert_box = QtWidgets.QMessageBox()
+        self.alert_box.setIcon(QtWidgets.QMessageBox.Critical)
+        self.alert_box.setText("Pistol Detected!")
+        self.alert_box.show()
+        self.alert_sound = QtMultimedia.QSoundEffect()
+        self.alert_sound.setSource(QtCore.QUrl.fromLocalFile('./res/sfx/siren.wav'))  
+        self.alert_sound.play()
+        logger_msg.warning("Suspicious activity involving firearms detected @ " + str(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+
+    def alert_knife(self):
+        self.alert_box = QtWidgets.QMessageBox()
+        self.alert_box.setIcon(QtWidgets.QMessageBox.Critical)
+        self.alert_box.setText("Knife Detected!")
+        self.alert_box.show()
+        self.alert_sound = QtMultimedia.QSoundEffect()
+        self.alert_sound.setSource(QtCore.QUrl.fromLocalFile('./res/sfx/siren.wav'))  
+        self.alert_sound.play()        
+        logger_msg.warning("Suspicious activity involving knives detected @ " + str(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
 
     def start_pistol_detect(self):
+        logger_msg.info("Pistol_Detect started")
+        self.info_start.play()        
         self.push_button_pistol_start.hide()
-        self.push_button_pistol_stop.show()
+        self.push_button_pistol_wait.show()
 
         self.pistol_buttons.removeWidget(self.w1)
         self.l1 = QtWidgets.QLabel()
-        loading = QtGui.QMovie("loading.gif")
+        loading = QtGui.QMovie("./res/images/loading.gif")
         self.l1.setMovie(loading)
         loading.start()
         self.pistol_buttons.addWidget(self.l1)             
@@ -246,7 +315,7 @@ class Window(QtWidgets.QMainWindow):
         self.worker_pistol = WorkerPistol()  # a new worker to perform those tasks
         self.worker_pistol.moveToThread(self.thread_pistol)  # move the worker into the thread, do this first before connecting the signals
         
-        self.worker_pistol.image_viewer_pistol = ImageViewerPistol()
+        self.worker_pistol.image_viewer_pistol = ImageViewer()
         self.worker_pistol.VideoSignal.connect(self.worker_pistol.image_viewer_pistol.setImage)
 
         self.pistol_video = QtWidgets.QWidget()
@@ -254,6 +323,7 @@ class Window(QtWidgets.QMainWindow):
 
         self.thread_pistol.started.connect(self.worker_pistol.work)  # begin our worker object's loop when the thread starts running
         self.worker_pistol.loaded.connect(self.remove_pistol_load)
+        self.worker_pistol.alert.connect(self.alert_pistol)
         self.push_button_pistol_stop.clicked.connect(self.stop_pistol)  # stop the loop on the stop button click
         self.worker_pistol.finished.connect(self.loop_finished)  # do something in the gui when the worker loop ends
         self.worker_pistol.finished.connect(self.thread_pistol.quit)  # tell the thread it's time to stop running
@@ -264,12 +334,14 @@ class Window(QtWidgets.QMainWindow):
         self.thread_pistol.start()
 
     def start_knife_detect(self):
+        logger_msg.info("Knife_Detect started")
+        self.info_start.play()            
         self.push_button_knife_start.hide()
-        self.push_button_knife_stop.show()
+        self.push_button_knife_wait.show()
 
         self.knife_buttons.removeWidget(self.w2)
         self.l2 = QtWidgets.QLabel()
-        loading = QtGui.QMovie("loading.gif")
+        loading = QtGui.QMovie("./res/images/loading.gif")
         self.l2.setMovie(loading)
         loading.start()
         self.knife_buttons.addWidget(self.l2)            
@@ -278,17 +350,15 @@ class Window(QtWidgets.QMainWindow):
         self.worker_knife = WorkerKnife()  # a new worker to perform those tasks
         self.worker_knife.moveToThread(self.thread_knife)  # move the worker into the thread, do this first before connecting the signals
 
-        self.worker_knife.image_viewer_knife = ImageViewerKnife()
+        self.worker_knife.image_viewer_knife = ImageViewer()
         self.worker_knife.VideoSignal.connect(self.worker_knife.image_viewer_knife.setImage)
 
         self.knife_video = QtWidgets.QWidget()
         self.knife_video = self.worker_knife.image_viewer_knife
 
-        # self.knife_buttons.removeWidget(self.l2)
-        # self.knife_buttons.addWidget(self.knife_video)
-
         self.thread_knife.started.connect(self.worker_knife.work)  # begin our worker object's loop when the thread starts running
         self.worker_knife.loaded.connect(self.remove_knife_load)
+        self.worker_knife.alert.connect(self.alert_knife)
         self.push_button_knife_stop.clicked.connect(self.stop_knife)  # stop the loop on the stop button click
         self.worker_knife.finished.connect(self.loop_finished)  # do something in the gui when the worker loop ends
         self.worker_knife.finished.connect(self.thread_knife.quit)  # tell the thread it's time to stop running
@@ -300,10 +370,12 @@ class Window(QtWidgets.QMainWindow):
 
     def stop_pistol(self):
         self.worker_pistol.working = False
+        self.info_stop.play()
         self.pistol_buttons.removeWidget(self.pistol_video)
         self.push_button_pistol_start.show()
         self.push_button_pistol_stop.hide()
         self.pistol_buttons.addWidget(self.w1)
+        logger_msg.info("Pistol_Detect stopped")        
 
         # self.l1.setPixmap(QtGui.QPixmap("white.jpg"))
         # self.horizontal_layout_videos.addWidget(self.l1)
@@ -313,10 +385,12 @@ class Window(QtWidgets.QMainWindow):
 
     def stop_knife(self):
         self.worker_knife.working = False
+        self.info_stop.play()
         self.knife_buttons.removeWidget(self.knife_video)
         self.push_button_knife_start.show()
         self.push_button_knife_stop.hide()
         self.knife_buttons.addWidget(self.w2)
+        logger_msg.info("Knife_Detect stopped")        
 
         # self.l2.setPixmap(QtGui.QPixmap("white.jpg"))
         # self.horizontal_layout_videos.addWidget(self.l2)
@@ -327,9 +401,10 @@ class Window(QtWidgets.QMainWindow):
 
 def main():  
     app = QtWidgets.QApplication(sys.argv)
+    app.setWindowIcon(QtGui.QIcon('./res/images/stop.jpg'))
     window = Window()
     window.show()
     sys.exit(app.exec_())
 
 if __name__ == '__main__':
-    main() 
+    main()    
