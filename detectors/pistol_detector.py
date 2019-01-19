@@ -134,13 +134,12 @@ if __name__ == '__main__':
     
     cap = cv2.VideoCapture(0)
     ret, frame = cap.read()
-    # frame = cv2.resize(frame, (0,0), fx=0.5, fy=0.5) # Scale resizing
 
-    pd = PistolDetector(frame)
+    pd = PistolDetector()
 
     while(True):
         ret, frame = cap.read()
-        # frame = cv2.resize(frame, (0,0), fx=0.5, fy=0.5) # Scale resizing
+        # frame = cv2.resize(frame, (400, 400))
         frame = pd.detect(frame)
 
 
