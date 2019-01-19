@@ -179,61 +179,71 @@ class Window(QtWidgets.QMainWindow):
         self.worker_pistol = None
         self.worker_knife = None
    
-        #Buttons to start the videocapture:
-     
+        # Setting up pistol buttons
         self.push_button_pistol_start = QtWidgets.QPushButton('Start Pistol_Detect')
         self.push_button_pistol_start.clicked.connect(self.start_pistol_detect)
+        self.push_button_pistol_wait = QtWidgets.QPushButton('Please wait... Pistol_Detect is loading...')
         self.push_button_pistol_stop = QtWidgets.QPushButton('Stop Pistol_Detect')
+        self.push_button_pistol_wait.hide()
         self.push_button_pistol_stop.hide()
 
+        # Setting up knife buttons
         self.push_button_knife_start = QtWidgets.QPushButton('Start Knife_Detect')
         self.push_button_knife_start.clicked.connect(self.start_knife_detect)
+        self.push_button_knife_wait = QtWidgets.QPushButton('Please Wait... Knife_Detect is loading...')
         self.push_button_knife_stop = QtWidgets.QPushButton('Stop Knife_Detect')
+        self.push_button_knife_wait.hide() 
         self.push_button_knife_stop.hide()
 
+        # Show initialised cam feed (offline)
         self.w1 = QtWidgets.QLabel()
         self.w1.setPixmap(QtGui.QPixmap("offline-pistol.png"))
         self.w2 = QtWidgets.QLabel()
         self.w2.setPixmap(QtGui.QPixmap("offline-knife.png"))
 
-        # self.horizontal_layout_videos = QtWidgets.QHBoxLayout()
-        # self.horizontal_layout_videos.addWidget(self.l1)
-        # self.horizontal_layout_videos.addWidget(self.l2)
-
+        # Vertical layout for pistol-related widgets
         self.pistol_buttons = QtWidgets.QVBoxLayout()
         self.pistol_buttons.addWidget(self.push_button_pistol_start)
+        self.pistol_buttons.addWidget(self.push_button_pistol_wait)
         self.pistol_buttons.addWidget(self.push_button_pistol_stop)
         self.pistol_buttons.addWidget(self.w1)
 
+        # Vertical layout for knife-related widgets
         self.knife_buttons = QtWidgets.QVBoxLayout()
         self.knife_buttons.addWidget(self.push_button_knife_start)
+        self.knife_buttons.addWidget(self.push_button_knife_wait)
         self.knife_buttons.addWidget(self.push_button_knife_stop)
         self.knife_buttons.addWidget(self.w2)
 
+        # Horizontal layout for both pistol and knife vertical layouts
         self.horizontal_layout_buttons = QtWidgets.QHBoxLayout()
         self.horizontal_layout_buttons.addLayout(self.pistol_buttons)
         self.horizontal_layout_buttons.addLayout(self.knife_buttons)
 
+        # Main layout for the central widget
         self.main_layout = QtWidgets.QVBoxLayout()
         self.main_layout.addLayout(self.horizontal_layout_buttons)    
-        # self.main_layout.addLayout(self.horizontal_layout_videos)
 
+        # Set central widget & its layout
         self.layout_widget = QtWidgets.QWidget()
         self.layout_widget.setLayout(self.main_layout)
-
         self.setCentralWidget(self.layout_widget)
 
     def remove_pistol_load(self):
         self.pistol_buttons.removeWidget(self.l1)
         self.pistol_buttons.addWidget(self.pistol_video)
+        self.push_button_pistol_wait.hide()
+        self.push_button_pistol_stop.show()
 
     def remove_knife_load(self):
         self.knife_buttons.removeWidget(self.l2)
         self.knife_buttons.addWidget(self.knife_video)
+        self.push_button_knife_wait.hide()
+        self.push_button_knife_stop.show()
 
     def start_pistol_detect(self):
         self.push_button_pistol_start.hide()
-        self.push_button_pistol_stop.show()
+        self.push_button_pistol_wait.show()
 
         self.pistol_buttons.removeWidget(self.w1)
         self.l1 = QtWidgets.QLabel()
@@ -265,7 +275,7 @@ class Window(QtWidgets.QMainWindow):
 
     def start_knife_detect(self):
         self.push_button_knife_start.hide()
-        self.push_button_knife_stop.show()
+        self.push_button_knife_wait.show()
 
         self.knife_buttons.removeWidget(self.w2)
         self.l2 = QtWidgets.QLabel()
@@ -283,9 +293,6 @@ class Window(QtWidgets.QMainWindow):
 
         self.knife_video = QtWidgets.QWidget()
         self.knife_video = self.worker_knife.image_viewer_knife
-
-        # self.knife_buttons.removeWidget(self.l2)
-        # self.knife_buttons.addWidget(self.knife_video)
 
         self.thread_knife.started.connect(self.worker_knife.work)  # begin our worker object's loop when the thread starts running
         self.worker_knife.loaded.connect(self.remove_knife_load)
