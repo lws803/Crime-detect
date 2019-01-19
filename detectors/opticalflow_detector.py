@@ -120,8 +120,8 @@ class OpticalflowDetector:
 
             # TODO: Add a probability function
             # Maximum average value seen: 7, will square the value for the probability function
-            # Allocation to the probability: 0.66 to the average, 0.33 to the knife confidence
-            pr = ((average**2)*13)/100 + knifeConfidence/3
+            # Allocation to the probability: 0.6 to the average, 0.4 to the knife confidence
+            pr = average/17 + (knifeConfidence*2)/5
             logger.info('combined pr: ' + str(pr))
             if (pr > PROBABILITY_THRESH):
                 self.votes.append(time.time())
@@ -158,15 +158,17 @@ if __name__ == '__main__':
     ret, frame = cap.read()
     # frame = cv2.resize(frame, (0,0), fx=0.5, fy=0.5) # Scale resizing
 
-    od = OpticalflowDetector(frame)
+    od = OpticalflowDetector(frame, log_level=logging.ERROR)
 
     while(True):
         ret, frame = cap.read()
         # frame = cv2.resize(frame, (0,0), fx=0.5, fy=0.5) # Scale resizing
         frame = od.detect(frame)
+        if (len(od.getVotes()) >= 5):
+            print ("Notified")
+            od.clearVotes()
 
-
-        frame = cv2.resize(frame, (0,0), fx=1.0/SCALE, fy=1.0/SCALE) # Scale resizing
+        # frame = cv2.resize(frame, (0,0), fx=1.0/SCALE, fy=1.0/SCALE) # Scale resizing
 
         cv2.imshow('image', frame)
 
