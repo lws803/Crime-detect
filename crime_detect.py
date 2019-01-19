@@ -25,6 +25,9 @@ from detectors.pistol_detector import PistolDetector
 camera_port = 0
 camera = cv2.VideoCapture(camera_port)
 
+pics = ["white.jpg"]*12
+SIZE = 0
+
 def grabVideoFeed():
     grabbed, frame = camera.read()
     return frame if grabbed else None
@@ -92,13 +95,17 @@ class WorkerPistol(QtCore.QObject):
 
             if (votes >= 5) & (self.alert_flag):
                 self.alert.emit()
+                global SIZE
+                pics[SIZE] = qt_image
+                SIZE += 1
+                SIZE = SIZE%12
                 self.alert_flag = False
 
             clear_output()
 
         self.flag = True
         # self.VideoSignal.emit(QtGui.QImage("white.jpg"))       
-        qt_image = QtGui.QImage("./res/images/offline-pistol.png")
+        qt_image = QtGui.QImage("./res/images/gun.jpeg")
         self.VideoSignal.emit(qt_image)
         self.finished.emit() # alert our gui that the loop stopped
 
@@ -144,6 +151,18 @@ class WorkerKnife(QtCore.QObject):
 
             if (votes >= 5) & (self.alert_flag):
                 self.alert.emit()
+                frame = cv2.resize(frame, (400, 400))
+                frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                height, width, _ = frame.shape                
+                capture = QtGui.QImage(frame.data,
+                                    width,
+                                    height,
+                                    color_swapped_image.strides[0],
+                                    QtGui.QImage.Format_RGB888)
+                global SIZE
+                pics[SIZE] = capture
+                SIZE += 1
+                SIZE = SIZE%12
                 self.alert_flag = False
 
             cv2.waitKey(40)
@@ -151,7 +170,7 @@ class WorkerKnife(QtCore.QObject):
 
         self.flag = True
         # self.VideoSignal.emit(QtGui.QImage("white.jpg"))       
-        qt_image = QtGui.QImage("./res/images/offline-knife.png")
+        qt_image = QtGui.QImage("./res/images/knife.jpg")
         self.VideoSignal.emit(qt_image)
         self.finished.emit() # alert our gui that the loop stopped
 
@@ -185,18 +204,78 @@ class XStream(QtCore.QObject):
             XStream._stdout = XStream()
         return XStream._stdout
 
+
+class ImagePopup(QtWidgets.QLabel):
+    """ 
+    The ImagePopup class is a QLabel that displays a popup, zoomed image 
+    on top of another label.  
+    """
+    def __init__(self, parent):
+        super(QtWidgets.QLabel, self).__init__(parent)
+        
+        thumb = parent.pixmap()
+        imageSize = thumb.size()
+        imageSize.setWidth(imageSize.width()*2)
+        imageSize.setHeight(imageSize.height()*2)
+        self.setPixmap(thumb.scaled(imageSize,QtCore.Qt.KeepAspectRatioByExpanding))
+        
+        # center the zoomed image on the thumb
+        position = self.cursor().pos()
+        position.setX(position.x() - thumb.size().width())
+        position.setY(position.y() - thumb.size().height())
+        self.move(position)
+        
+        # FramelessWindowHint may not work on some window managers on Linux
+        # so I force also the flag X11BypassWindowManagerHint
+        self.setWindowFlags(QtCore.Qt.Popup | QtCore.Qt.WindowStaysOnTopHint 
+                            | QtCore.Qt.FramelessWindowHint 
+                            | QtCore.Qt.X11BypassWindowManagerHint)
+
+    def leaveEvent(self, event):
+        """ When the mouse leave this widget, destroy it. """
+        self.destroy()
+        
+
+class ImageLabel(QtWidgets.QLabel):
+    """ This widget displays an ImagePopup when the mouse enter its region """
+    def enterEvent(self, event):
+        self.p = ImagePopup(self)
+        self.p.show()
+        event.accept() 
+
+class ImageGallery(QtWidgets.QDialog):
+    
+    def __init__(self, parent=None):
+        super(QtWidgets.QDialog, self).__init__(parent)
+        self.setWindowTitle("Image Gallery")
+        self.setLayout(QtWidgets.QGridLayout(self))
+    
+    def populate(self, pics, size, imagesPerRow=4, 
+                 flags=QtCore.Qt.KeepAspectRatioByExpanding):
+        row = col = 0
+        for pic in pics:
+            label = ImageLabel("")
+            pixmap = QtGui.QPixmap(pic)
+            pixmap = pixmap.scaled(size, flags)
+            label.setPixmap(pixmap)
+            self.layout().addWidget(label, row, col)
+            col +=1
+            if col % imagesPerRow == 0:
+                row += 1
+                col = 0
+
 class Window(QtWidgets.QMainWindow):
 
     def __init__(self):
         super(Window, self).__init__()
         self.setWindowTitle("Crime Predict")
-        self.setStyleSheet("./res/images/background-color: white;")         
+        self.setStyleSheet("background-color: white;")         
 
         self.thread_pistol = None
         self.thread_knife = None
         self.worker_pistol = None
         self.worker_knife = None
-   
+
         # Setting up pistol buttons
         self.push_button_pistol_start = QtWidgets.QPushButton('Start Pistol_Detect')
         self.push_button_pistol_start.clicked.connect(self.start_pistol_detect)
@@ -215,9 +294,9 @@ class Window(QtWidgets.QMainWindow):
 
         # Show initialised cam feed (offline)
         self.w1 = QtWidgets.QLabel()
-        self.w1.setPixmap(QtGui.QPixmap("./res/images/offline-pistol.png"))
+        self.w1.setPixmap(QtGui.QPixmap("./res/images/gun.jpeg"))
         self.w2 = QtWidgets.QLabel()
-        self.w2.setPixmap(QtGui.QPixmap("./res/images/offline-knife.png"))
+        self.w2.setPixmap(QtGui.QPixmap("./res/images/knife.jpg"))
 
         # Vertical layout for pistol-related widgets
         self.pistol_buttons = QtWidgets.QVBoxLayout()
@@ -245,15 +324,31 @@ class Window(QtWidgets.QMainWindow):
         XStream.stdout().messageWritten.connect( self.message_box.insertPlainText )
         self.message_box.insertPlainText('WELCOME TO CRIME_PREDICT\n')
 
-        # Main layout for the central widget
-        self.main_layout = QtWidgets.QVBoxLayout()
-        self.main_layout.addLayout(self.horizontal_layout_buttons)  
-        self.main_layout.addWidget(self.message_box)  
+        # Initialize tab screen
+        self.tabs = QtWidgets.QTabWidget()
+        self.tab1 = QtWidgets.QWidget()
+        self.tab2 = QtWidgets.QWidget()
+        
+        # Add tabs
+        self.tabs.addTab(self.tab1,"Camera Feeds")
+        self.tabs.addTab(self.tab2,"Alerts and Events Center")               
 
-        # Set central widget & its layout
-        self.layout_widget = QtWidgets.QWidget()
-        self.layout_widget.setLayout(self.main_layout)
-        self.setCentralWidget(self.layout_widget)
+        # Set Tab 1 layout
+        self.tab1.layout = QtWidgets.QVBoxLayout()
+        self.tab1.layout.addLayout(self.horizontal_layout_buttons)  
+        self.tab1.layout.addWidget(self.message_box) 
+        self.tab1.setLayout(self.tab1.layout)     
+
+        # Image gallery
+        self.ig = ImageGallery()
+        self.ig.populate(pics, QtCore.QSize(200,200))
+        self.ig.show()
+
+        # Set Tab 2 layout    
+        self.tab2.layout = QtWidgets.QVBoxLayout()
+        # self.tab2.layout.addLayout(self.horizontal_layout_buttons)  
+        self.tab2.layout.addWidget(self.ig) 
+        self.tab2.setLayout(self.tab2.layout)   
 
         # Play start-up sound
         self.start_up_sound = QtMultimedia.QSoundEffect()
@@ -264,7 +359,9 @@ class Window(QtWidgets.QMainWindow):
         self.info_start = QtMultimedia.QSoundEffect()
         self.info_start.setSource(QtCore.QUrl.fromLocalFile('./res/sfx/info-start.wav'))
         self.info_stop = QtMultimedia.QSoundEffect()
-        self.info_stop.setSource(QtCore.QUrl.fromLocalFile('./res/sfx/info-stop.wav'))                    
+        self.info_stop.setSource(QtCore.QUrl.fromLocalFile('./res/sfx/info-stop.wav'))     
+
+        self.setCentralWidget(self.tabs)
 
     def remove_pistol_load(self):
         self.pistol_buttons.removeWidget(self.l1)
@@ -286,6 +383,7 @@ class Window(QtWidgets.QMainWindow):
         self.alert_sound = QtMultimedia.QSoundEffect()
         self.alert_sound.setSource(QtCore.QUrl.fromLocalFile('./res/sfx/siren.wav'))  
         self.alert_sound.play()
+        self.ig.populate(pics, QtCore.QSize(200,200))        
         logger_msg.warning("Suspicious activity involving firearms detected @ " + str(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
 
     def alert_knife(self):
@@ -295,7 +393,8 @@ class Window(QtWidgets.QMainWindow):
         self.alert_box.show()
         self.alert_sound = QtMultimedia.QSoundEffect()
         self.alert_sound.setSource(QtCore.QUrl.fromLocalFile('./res/sfx/siren.wav'))  
-        self.alert_sound.play()        
+        self.alert_sound.play()       
+        self.ig.populate(pics, QtCore.QSize(200,200))         
         logger_msg.warning("Suspicious activity involving knives detected @ " + str(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
 
     def start_pistol_detect(self):
@@ -399,11 +498,17 @@ class Window(QtWidgets.QMainWindow):
         # received a callback from the thread that it completed     
         print('Looped Finished')
 
+
 def main():  
     app = QtWidgets.QApplication(sys.argv)
     app.setWindowIcon(QtGui.QIcon('./res/images/stop.jpg'))
     window = Window()
     window.show()
+
+    # ig = ImageGallery()
+    # ig.populate(pics, QtCore.QSize(200,200))
+    # ig.show()
+
     sys.exit(app.exec_())
 
 if __name__ == '__main__':
