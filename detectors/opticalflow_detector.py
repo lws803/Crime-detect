@@ -15,6 +15,7 @@ SCALE = 0.3
 VOTE_THRESH = 5
 PROBABILITY_THRESH = 0.6
 TIME_THRESH = 300000 # 5 mins
+GAMMA_VALUE = 1
 
 logger = logging.getLogger("Optical Flow Detector")
 
@@ -26,7 +27,7 @@ class OpticalflowDetector:
     def __init__ (self, frame, log_level=logging.DEBUG):
         logger.setLevel(log_level)
         frame = cv2.resize(frame,None,fx=SCALE,fy=SCALE)
-        frame = self.adjust_gamma(frame, gamma=2.0)
+        frame = self.adjust_gamma(frame, gamma=GAMMA_VALUE)
 
         self.prevgray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         self.fps_time = 0
@@ -49,7 +50,7 @@ class OpticalflowDetector:
         # global maxAverage
         frame = cv2.resize(frame,None,fx=SCALE,fy=SCALE)
 
-        frame = self.adjust_gamma(frame, gamma=2.0)
+        frame = self.adjust_gamma(frame, gamma=GAMMA_VALUE)
 
         debugImage = frame.copy()
 
@@ -120,8 +121,8 @@ class OpticalflowDetector:
 
             # TODO: Add a probability function
             # Maximum average value seen: 7, will square the value for the probability function
-            # Allocation to the probability: 0.6 to the average, 0.4 to the knife confidence
-            pr = average/17 + (knifeConfidence*2)/5
+            # Allocation to the probability: 0.5 to the average, 0.5 to the knife confidence
+            pr = average/18 + (knifeConfidence)/2
             logger.info('combined pr: ' + str(pr))
             if (pr > PROBABILITY_THRESH):
                 self.votes.append(time.time())
