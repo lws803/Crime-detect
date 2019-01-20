@@ -6,9 +6,6 @@ Crime-detect is a surveillance program designed to reduce the burden of threat d
 
 ![comic strip](https://raw.githubusercontent.com/lws803/Crime-detect/master/images/Crimedetect_Comic_RedBox.png "Situation Comic")
 
-## Problems Detected
-- OpenPose creates problems when the knife detector is integrated, hard to distinguish between humans in the frame and who is holding the knife. Looking for other alternatives now. 
-
 ## Problem we are trying to solve
 Did you know that there is a 1 in 2,499 lifetime chance of being involved in a stabbing? Moreover, can you believe In the United States there is a 1 in 315 chance of being part of a shooting? Now imagine, how often such encounters can be detected and resolved in a quick and efficient manner, thereby potentially saving lives? With encounters such as this occurring often, and with an increasing trend of mass shootings, a smart surveillance system that can instantly alert the authorities of violent crime is vital in ensuring the safety of the general public and our loved ones.
 
@@ -22,3 +19,7 @@ Other crime prediction software, such as Cloud Walk, perform citizen trustworthi
 The following flowchart describes the steps of our program in detecting crime:
 
 ![flowchart](https://raw.githubusercontent.com/lws803/Crime-detect/master/images/CrimeDetect_flowchart.png "Program flowchart")
+
+## Problems Detected during HacknRoll
+- OpenPose creates problems when the knife detector is integrated, hard to distinguish between humans in the frame and who is holding the knife. Looking for other alternatives now. Alternative found - **Optical Flow to determine average speed of human**
+- Very low levels of lighting can render the knife undetectable by our algo, hence we are using gamma correction to try and increase the brightness of the frame. However, gamma correction also blurs the image so we need to find a good level of gamma correction such that our knife is not blurred
