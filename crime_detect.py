@@ -105,7 +105,7 @@ class WorkerPistol(QtCore.QObject):
 
         self.flag = True
         # self.VideoSignal.emit(QtGui.QImage("white.jpg"))       
-        qt_image = QtGui.QImage("./res/images/gun.jpeg")
+        qt_image = QtGui.QImage("gun.jpeg")
         self.VideoSignal.emit(qt_image)
         self.finished.emit() # alert our gui that the loop stopped
 
@@ -170,7 +170,7 @@ class WorkerKnife(QtCore.QObject):
 
         self.flag = True
         # self.VideoSignal.emit(QtGui.QImage("white.jpg"))       
-        qt_image = QtGui.QImage("./res/images/knife.jpg")
+        qt_image = QtGui.QImage("knife.jpg")
         self.VideoSignal.emit(qt_image)
         self.finished.emit() # alert our gui that the loop stopped
 
@@ -294,9 +294,9 @@ class Window(QtWidgets.QMainWindow):
 
         # Show initialised cam feed (offline)
         self.w1 = QtWidgets.QLabel()
-        self.w1.setPixmap(QtGui.QPixmap("./res/images/gun.jpeg"))
+        self.w1.setPixmap(QtGui.QPixmap("gun.jpeg"))
         self.w2 = QtWidgets.QLabel()
-        self.w2.setPixmap(QtGui.QPixmap("./res/images/knife.jpg"))
+        self.w2.setPixmap(QtGui.QPixmap("knife.jpg"))
 
         # Vertical layout for pistol-related widgets
         self.pistol_buttons = QtWidgets.QVBoxLayout()
@@ -352,14 +352,14 @@ class Window(QtWidgets.QMainWindow):
 
         # Play start-up sound
         self.start_up_sound = QtMultimedia.QSoundEffect()
-        self.start_up_sound.setSource(QtCore.QUrl.fromLocalFile('./res/sfx/start-up.wav'))  
+        self.start_up_sound.setSource(QtCore.QUrl.fromLocalFile('start-up.wav'))  
         self.start_up_sound.play()
 
         # Initialise sounds FX
         self.info_start = QtMultimedia.QSoundEffect()
-        self.info_start.setSource(QtCore.QUrl.fromLocalFile('./res/sfx/info-start.wav'))
+        self.info_start.setSource(QtCore.QUrl.fromLocalFile('info-start.wav'))
         self.info_stop = QtMultimedia.QSoundEffect()
-        self.info_stop.setSource(QtCore.QUrl.fromLocalFile('./res/sfx/info-stop.wav'))     
+        self.info_stop.setSource(QtCore.QUrl.fromLocalFile('info-stop.wav'))     
 
         self.setCentralWidget(self.tabs)
 
@@ -381,7 +381,7 @@ class Window(QtWidgets.QMainWindow):
         self.alert_box.setText("Pistol Detected!")
         self.alert_box.show()
         self.alert_sound = QtMultimedia.QSoundEffect()
-        self.alert_sound.setSource(QtCore.QUrl.fromLocalFile('./res/sfx/siren.wav'))  
+        self.alert_sound.setSource(QtCore.QUrl.fromLocalFile('siren.wav'))  
         self.alert_sound.play()
         self.ig.populate(pics, QtCore.QSize(200,200))        
         logger_msg.warning("Suspicious activity involving firearms detected @ " + str(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
@@ -392,7 +392,7 @@ class Window(QtWidgets.QMainWindow):
         self.alert_box.setText("Knife Detected!")
         self.alert_box.show()
         self.alert_sound = QtMultimedia.QSoundEffect()
-        self.alert_sound.setSource(QtCore.QUrl.fromLocalFile('./res/sfx/siren.wav'))  
+        self.alert_sound.setSource(QtCore.QUrl.fromLocalFile('siren.wav'))  
         self.alert_sound.play()       
         self.ig.populate(pics, QtCore.QSize(200,200))         
         logger_msg.warning("Suspicious activity involving knives detected @ " + str(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
@@ -405,7 +405,7 @@ class Window(QtWidgets.QMainWindow):
 
         self.pistol_buttons.removeWidget(self.w1)
         self.l1 = QtWidgets.QLabel()
-        loading = QtGui.QMovie("./res/images/loading.gif")
+        loading = QtGui.QMovie("loading.gif")
         self.l1.setMovie(loading)
         loading.start()
         self.pistol_buttons.addWidget(self.l1)             
@@ -440,7 +440,7 @@ class Window(QtWidgets.QMainWindow):
 
         self.knife_buttons.removeWidget(self.w2)
         self.l2 = QtWidgets.QLabel()
-        loading = QtGui.QMovie("./res/images/loading.gif")
+        loading = QtGui.QMovie("loading.gif")
         self.l2.setMovie(loading)
         loading.start()
         self.knife_buttons.addWidget(self.l2)            
@@ -501,7 +501,7 @@ class Window(QtWidgets.QMainWindow):
 
 def main():  
     app = QtWidgets.QApplication(sys.argv)
-    app.setWindowIcon(QtGui.QIcon('./res/images/stop.jpg'))
+    app.setWindowIcon(QtGui.QIcon('stop.jpg'))
     window = Window()
     window.show()
 
