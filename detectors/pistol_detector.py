@@ -14,8 +14,9 @@ label_lines = [line.rstrip() for line
            in tf.gfile.GFile('./data/labels/gun_labels.txt')]
 
 SCALE = 0.3
-SCORE_THRESH = 0.7
+SCORE_THRESH = 0.4
 TIME_THRESH = 300000 # 5 mins
+GAMMA_VALUE = 2
 
 logger = logging.getLogger("Pistol Detector")
 logger.setLevel(logging.DEBUG)
@@ -51,12 +52,23 @@ class PistolDetector:
     
         logger.info('Took {} seconds to unpersist the graph'.format(timeit.default_timer() - start_time))
 
+    def adjust_gamma(self, image, gamma=1.0):
+        # build a lookup table mapping the pixel values [0, 255] to
+        # their adjusted gamma values
+        invGamma = 1.0 / gamma
+        table = np.array([((i / 255.0) ** invGamma) * 255
+            for i in np.arange(0, 256)]).astype("uint8")
+    
+        # apply gamma correction using the lookup table
+        return cv2.LUT(image, table)
+
 
     def detect(self, frame):
         if frame is None:
             raise SystemError('Issue grabbing the frame')
         
         frame = cv2.resize(frame,None,fx=SCALE,fy=SCALE)
+        frame = self.adjust_gamma(frame, gamma=GAMMA_VALUE)
         debugImage = frame.copy()
 
         humans = self.hd.detect(frame)
@@ -80,8 +92,18 @@ class PistolDetector:
             humanBox[3] = int(humanRect[2]*height) # ymax
             h = (humanBox[3] - humanBox[1])/2
             h = int(h)
-            crop_img = frame[humanBox[1]:humanBox[1]+h, humanBox[0]:humanBox[2]]
-            cv2.rectangle(debugImage, (humanBox[0], humanBox[1]), (humanBox[2], humanBox[1]+h), (0, 255, 255), 1)
+            w = (humanBox[2]-humanBox[0])
+            half_w = 1
+            half_w = int(w)
+            x_min = humanBox[0]-half_w
+            if (x_min < 0):
+                x_min = 0
+            x_max = humanBox[2]+w+half_w
+            if (x_max >= width):
+                x_max = width-1
+
+            crop_img = frame[humanBox[1]:humanBox[1]+h, x_min:x_max]
+            cv2.rectangle(debugImage, (x_min, humanBox[1]), (x_max, humanBox[1]+h), (0, 255, 255), 1)
 
         #     # adhere to TS graph input structure
             crop_img = cv2.resize(crop_img, (299, 299), interpolation=cv2.INTER_CUBIC)

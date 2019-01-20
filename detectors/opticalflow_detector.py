@@ -15,7 +15,7 @@ SCALE = 0.3
 VOTE_THRESH = 5
 PROBABILITY_THRESH = 0.6
 TIME_THRESH = 300000 # 5 mins
-GAMMA_VALUE = 1
+GAMMA_VALUE = 2
 
 logger = logging.getLogger("Optical Flow Detector")
 
